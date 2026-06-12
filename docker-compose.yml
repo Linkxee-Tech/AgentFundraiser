@@ -1,0 +1,11 @@
+services:
+  agent:
+    build:
+      context: ./backend
+    env_file:
+      - ./backend/.env
+    restart: unless-stopped
+    ports:
+      - "8787:8787"
+    volumes:
+      - ./backend/data:/app/data

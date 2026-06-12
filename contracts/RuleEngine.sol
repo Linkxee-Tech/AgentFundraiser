@@ -19,9 +19,17 @@ contract RuleEngine is Ownable {
     event NumericRuleUpdated(bytes32 indexed key, uint256 value);
     event BoolRuleUpdated(bytes32 indexed key, bool value);
     event StringRuleUpdated(bytes32 indexed key, string value);
+    event RuleCreated(bytes32 indexed key, string ruleType);
+    event RuleChanged(bytes32 indexed key, string ruleType);
+    event RuleDeleted(bytes32 indexed key, string ruleType);
 
     modifier onlyAgent() {
         require(msg.sender == agent, "RuleEngine: caller is not agent");
+        _;
+    }
+
+    modifier onlyAgentOrOwner() {
+        require(msg.sender == agent || msg.sender == owner(), "RuleEngine: caller is not authorized");
         _;
     }
 
@@ -38,16 +46,37 @@ contract RuleEngine is Ownable {
         agent = newAgent;
     }
 
-    function setNumericRule(bytes32 key, uint256 value) external onlyAgent {
+    function setNumericRule(bytes32 key, uint256 value) external onlyAgentOrOwner {
         _setNumericRule(key, value);
     }
 
-    function setBoolRule(bytes32 key, bool value) external onlyAgent {
+    function setBoolRule(bytes32 key, bool value) external onlyAgentOrOwner {
         _setBoolRule(key, value);
     }
 
-    function setStringRule(bytes32 key, string calldata value) external onlyAgent {
+    function setStringRule(bytes32 key, string calldata value) external onlyAgentOrOwner {
         _setStringRule(key, value);
+    }
+
+    function deleteNumericRule(bytes32 key) external onlyAgentOrOwner {
+        require(numericRuleSet[key], "RuleEngine: rule not found");
+        delete numericRules[key];
+        delete numericRuleSet[key];
+        emit RuleDeleted(key, "numeric");
+    }
+
+    function deleteBoolRule(bytes32 key) external onlyAgentOrOwner {
+        require(boolRuleSet[key], "RuleEngine: rule not found");
+        delete boolRules[key];
+        delete boolRuleSet[key];
+        emit RuleDeleted(key, "bool");
+    }
+
+    function deleteStringRule(bytes32 key) external onlyAgentOrOwner {
+        require(stringRuleSet[key], "RuleEngine: rule not found");
+        delete stringRules[key];
+        delete stringRuleSet[key];
+        emit RuleDeleted(key, "string");
     }
 
     function getNumericRule(bytes32 key) external view returns (uint256) {
@@ -92,23 +121,41 @@ contract RuleEngine is Ownable {
 
     function _setNumericRule(bytes32 key, uint256 value) private {
         require(key != bytes32(0), "RuleEngine: invalid key");
+        bool isNew = !numericRuleSet[key];
         numericRules[key] = value;
         numericRuleSet[key] = true;
         emit NumericRuleUpdated(key, value);
+        if (isNew) {
+            emit RuleCreated(key, "numeric");
+        } else {
+            emit RuleChanged(key, "numeric");
+        }
     }
 
     function _setBoolRule(bytes32 key, bool value) private {
         require(key != bytes32(0), "RuleEngine: invalid key");
+        bool isNew = !boolRuleSet[key];
         boolRules[key] = value;
         boolRuleSet[key] = true;
         emit BoolRuleUpdated(key, value);
+        if (isNew) {
+            emit RuleCreated(key, "bool");
+        } else {
+            emit RuleChanged(key, "bool");
+        }
     }
 
     function _setStringRule(bytes32 key, string memory value) private {
         require(key != bytes32(0), "RuleEngine: invalid key");
+        bool isNew = !stringRuleSet[key];
         stringRules[key] = value;
         stringRuleSet[key] = true;
         emit StringRuleUpdated(key, value);
+        if (isNew) {
+            emit RuleCreated(key, "string");
+        } else {
+            emit RuleChanged(key, "string");
+        }
     }
 
     function _key(string memory name) private pure returns (bytes32) {

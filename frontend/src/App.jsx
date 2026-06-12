@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { ethers } from "ethers";
-import { isChainReady, createContracts, fetchRuleSet, fetchTreasuryBalance, fetchBounties, fetchAgents, fetchPayments, fetchTreasuryRequests, tokenAddresses, createERC20Contract, contractAddress } from "./contractHelpers";
+import { isChainReady, createContracts, fetchRuleSet, fetchTreasuryBalance, fetchBounties, fetchAgents, fetchPayments, fetchTreasuryRequests, fetchAccessProfile, switchToPharos, tokenAddresses, createERC20Contract, contractAddress } from "./contractHelpers";
 
 
 
@@ -21,10 +21,8 @@ const utcHour  = () => new Date().getUTCHours();
 const isMarketingWindow = () => { const h=utcHour(); return h>=9&&h<17; };
 const MULTISIG_THRESHOLD  = 100;
 const RESERVE_FLOOR_DEF   = 200;
-const WALLET_ADDR         = "0xOwner9F8E7D6C5B4A39283746501928374650";
 const TX_CONFIRMATIONS    = 2;
 const waitForTx           = (tx) => tx.wait(TX_CONFIRMATIONS);
-const ROLES               = ["Owner","Agent","Verifier","User"];
 const PAYMENT_CATEGORIES  = ["bounty","a2a","marketing","community","other"];
 
 const TOKENS = {
@@ -36,115 +34,6 @@ const TOKENS = {
 // ─────────────────────────────────────────────────────────────────────────────
 
 // SEED DATA
-
-// ─────────────────────────────────────────────────────────────────────────────
-
-const SEED_BOUNTIES = [
-  { id:1, description:"Write a Twitter thread about Pharos AI agents", reward:50,  token:"PROS",   deadline:now()+86400000*3, status:"open",      submissions:[], creator:"0xOwner…9A0B", bond:1, category:"marketing" },
-  { id:2, description:"Create a demo video walkthrough of Agent Fundraiser", reward:120, token:"PROS",  deadline:now()+86400000*5, status:"submitted", submissions:[{id:"s1",submitter:"0xDEAD…BEEF",proof:"ipfs://QmXyz123abc",time:tsMs(500000),bond:1,aiScore:null,aiReasoning:null}], creator:"0xOwner…9A0B", bond:1, category:"community" },
-  { id:3, description:"Audit the Rule Engine contract for vulnerabilities", reward:200, token:"PROS",  deadline:now()+86400000*7, status:"approved",  submissions:[{id:"s2",submitter:"0xABCD…1234",proof:"ipfs://QmAbc456def",time:tsMs(14400000),bond:1,aiScore:92,aiReasoning:"Submission matches task requirements with high confidence. Security audit report is complete, well-structured, and covers all contract functions.",approved:true}], creator:"0xOwner…9A0B", bond:1, category:"bounty" },
-  { id:4, description:"Design UI components for the bounty portal", reward:75,  token:"PROS",   deadline:now()-3600000,    status:"expired",   submissions:[], creator:"0xOwner…9A0B", bond:1, category:"marketing" },
-  { id:5, description:"Create Pharos testnet faucet tutorial video", reward:40,  token:"USDC-P", deadline:now()+86400000*2, status:"open",      submissions:[], creator:"0xOwner…9A0B", bond:0.5, category:"community" },
-];
-
-const SEED_AGENTS = [
-  { address:"0x1A2b3C4d5E6f7A8B9C0D1E2F3A4B5C6D7E8F9A0B", name:"Analytics Agent",   metaURI:"ipfs://QmAnalytics001", active:true,  registered:now()-86400000*5, dailyLimit:20,  paidToday:5,  category:"analytics" },
-  { address:"0x9F8E7D6C5B4A3928374650192837465019283746", name:"Social Media Agent", metaURI:"ipfs://QmSocial002",   active:true,  registered:now()-86400000*3, dailyLimit:30,  paidToday:8,  category:"marketing" },
-  { address:"0x3C4D5E6F7A8B9C0D1E2F3A4B5C6D7E8F9A0B1C2D", name:"Research Agent",   metaURI:"ipfs://QmResearch003", active:false, registered:now()-86400000*1, dailyLimit:50,  paidToday:0,  category:"research" },
-  { address:"0xF1E2D3C4B5A69788970605040302010099887766", name:"Monitoring Agent",  metaURI:"ipfs://QmMonitor004",  active:true,  registered:now()-86400000*2, dailyLimit:10,  paidToday:2,  category:"operations" },
-
-];
-
-const SEED_SCHEDULED = [
-  { id:"sch1", name:"Analytics Agent",   address:"0x1A2b3C4d5E6f7A8B9C0D1E2F3A4B5C6D7E8F9A0B", amount:5,  token:"PROS", interval:"daily",  lastPaid:now()-90000000,  memo:"Daily analytics report",   enabled:true,  category:"a2a" },
-  { id:"sch2", name:"Social Media Agent",address:"0x9F8E7D6C5B4A3928374650192837465019283746",  amount:8,  token:"PROS", interval:"daily",  lastPaid:now()-90000000,  memo:"Social campaign batch",    enabled:true,  category:"marketing" },
-  { id:"sch3", name:"Research Agent",    address:"0x3C4D5E6F7A8B9C0D1E2F3A4B5C6D7E8F9A0B1C2D", amount:15, token:"PROS", interval:"weekly", lastPaid:now()-700000000, memo:"Weekly research digest",   enabled:false, category:"a2a" },
-  { id:"sch4", name:"Monitoring Agent",  address:"0xF1E2D3C4B5A69788970605040302010099887766",  amount:2,  token:"PROS", interval:"daily",  lastPaid:now()-90000000,  memo:"Uptime monitoring fee",    enabled:true,  category:"operations" },
-];
-
-const SEED_PAYMENTS = [
-  { id:"p1", recipient:"0x1A2b…9A0B", name:"Analytics Agent",   amount:5,   token:"PROS",  memo:"Daily report #47",          time:now()-3600000,  type:"scheduled", category:"a2a",       txHash:"0xa1b2…c3d4" },
-  { id:"p2", recipient:"0x9F8E…3746", name:"Social Media Agent", amount:8,   token:"PROS",  memo:"Pharos campaign June batch", time:now()-7200000,  type:"manual",    category:"marketing", txHash:"0xe5f6…a7b8" },
-  { id:"p3", recipient:"0xDEAD…0001", name:"Bounty Winner",      amount:200, token:"PROS",  memo:"Bounty #3 payout",          time:now()-14400000, type:"bounty",    category:"bounty",    txHash:"0xc9d0…e1f2" },
-  { id:"p4", recipient:"0xF1E2…7766", name:"Monitoring Agent",   amount:2,   token:"PROS",  memo:"Uptime monitoring fee",     time:now()-1800000,  type:"scheduled", category:"operations",txHash:"0x3456…7890" },
-];
-
-const SEED_TXNS = [
-  { id:"t1", type:"deposit",  from:"0xUser1…aBcD", to:null,            amount:100,  token:"PROS",   time:now()-600000,   txHash:"0xhsh…t1" },
-  { id:"t2", type:"deposit",  from:"0xUser2…1234", to:null,            amount:250,  token:"PROS",   time:now()-1800000,  txHash:"0xhsh…t2" },
-  { id:"t3", type:"deposit",  from:"0xUser3…5678", to:null,            amount:80,   token:"USDC-P", time:now()-3600000,  txHash:"0xhsh…t3" },
-  { id:"t4", type:"withdraw", from:null,           to:"Bounty #3",     amount:200,  token:"PROS",   time:now()-14400000, txHash:"0xhsh…t4" },
-  { id:"t5", type:"agentpay", from:null,           to:"Analytics Agent",amount:5,   token:"PROS",   time:now()-3600000,  txHash:"0xhsh…t5" },
-  { id:"t6", type:"deposit",  from:"0xUser4…9ABC", to:null,            amount:50,   token:"ETH-P",  time:now()-7200000,  txHash:"0xhsh…t6" },
-];
-
-const SEED_MULTISIG = [
-  { id:"ms1", action:"Payment", recipient:"0xExternal…AB12", amount:150, token:"PROS", memo:"Marketing agency invoice Q2", requestedBy:"Agent", approvals:["Agent"], threshold:2, status:"pending", time:now()-3600000, category:"marketing" },
-  { id:"ms2", action:"Withdrawal", recipient:"0xPartner…CF34", amount:300, token:"PROS", memo:"Community grant disbursement", requestedBy:"Agent", approvals:["Agent","Owner"], threshold:2, status:"approved", time:now()-86400000, category:"community" },
-];
-
-const SEED_RULES = {
-  numeric: {
-    MAX_DAILY_SPEND_PERCENT:    { value:20,  desc:"Max % of treasury spendable in 24h" },
-    MIN_BALANCE_FOR_MARKETING:  { value:500, desc:"Min PROS balance before marketing spend unlocks" },
-    MAX_SINGLE_BOUNTY_REWARD:   { value:500, desc:"Cap per individual bounty payout (PROS)" },
-    MULTISIG_THRESHOLD:         { value:100, desc:"Payments above this require 2-of-2 approval (PROS)" },
-    RESERVE_FLOOR:              { value:200, desc:"Minimum treasury reserve (PROS) — never spendable" },
-    SUBMISSION_BOND:            { value:1,   desc:"Anti-spam bond per bounty submission (PROS, refunded)" },
-    RATE_LIMIT_WINDOW_HOURS:    { value:24,  desc:"Hours before same account can receive another payout" },
-    MARKETING_BUDGET_PERCENT:   { value:15,  desc:"Max % of treasury for marketing per cycle" },
-    COMMUNITY_BUDGET_PERCENT:   { value:10,  desc:"Max % of treasury for community operations per cycle" },
-  },
-
-  bool: {
-    ALLOW_BOUNTY_PAYMENTS:         { value:true,  desc:"Agent may pay out approved bounties" },
-    ALLOW_AGENT_TO_AGENT_PAYMENTS: { value:true,  desc:"Agent may route A2A payments" },
-    ALLOW_MARKETING_PAYMENTS:      { value:true,  desc:"Allow marketing budget spend" },
-    ALLOW_COMMUNITY_PAYMENTS:      { value:true,  desc:"Allow community operations payments" },
-    REQUIRE_MANUAL_BOUNTY_APPROVAL:{ value:false, desc:"All bounties require human review (disables AI auto-approve)" },
-    REQUIRE_SENTIMENT_CHECK:       { value:true,  desc:"Run Gemini NLP sentiment on social bounty submissions" },
-    ENFORCE_MARKETING_HOURS:       { value:true,  desc:"Only allow marketing payments 09:00–17:00 UTC" },
-    EMERGENCY_PAUSE:               { value:false, desc:"⚠ Halt ALL outgoing payments immediately" },
-  },
-
-  string: {
-    REQUIRED_TAG:         { value:"#pharos",                    desc:"Required hashtag in social bounty submissions" },
-    ALERT_WEBHOOK:        { value:"https://discord.com/api/webhooks/...", desc:"Discord/Telegram webhook for alerts" },
-    EMERGENCY_SAFE_ADDR:  { value:"0xSafeMultiSig…0000",        desc:"Emergency withdrawal destination" },
-    GEMINI_MODEL:         { value:"gemini-1.5-pro",             desc:"Gemini model used for AI bounty review" },
-    AGENT_VERSION:        { value:"v1.0.0-non-upgradeable",     desc:"Contract version (non-upgradeable by design)" },
-    PHAROS_RPC_URL:       { value:"wss://rpc.pharos.testnet/ws", desc:"Pharos testnet WebSocket RPC endpoint" },
-  }
-};
-
-const SEED_LOGS = [
-  { id:"l0",  type:"info",     text:"Agent Fundraiser v1.0.0 initialized on Pharos testnet (non-upgradeable)",         time:now()-9000000 },
-  { id:"l1",  type:"info",     text:"Treasury loaded — PROS: 1450.00 | USDC-P: 320.00 | ETH-P: 0.4700",              time:now()-8900000 },
-  { id:"l2",  type:"info",     text:"WebSocket connected to wss://rpc.pharos.testnet/ws — listening for events",      time:now()-8800000 },
-  { id:"l3",  type:"info",     text:"Rule Engine loaded — 9 numeric | 8 boolean | 6 string rules active",             time:now()-8700000 },
-  { id:"l4",  type:"deposit",  text:"Deposited: 250 PROS from 0xUser2…1234 (tx: 0xhsh…t2)",                           time:now()-1800000 },
-  { id:"l5",  type:"rule",     text:"Rule check: MAX_DAILY_SPEND_PERCENT=20% → 290 PROS/day allowed ✓",               time:now()-1700000 },
-  { id:"l6",  type:"deposit",  text:"Deposited: 100 PROS from 0xUser1…aBcD (tx: 0xhsh…t1)",                           time:now()-600000  },
-  { id:"l7",  type:"bounty",   text:"Bounty #2 submission received — proof: ipfs://QmXyz123abc by 0xDEAD…BEEF",       time:now()-500000  },
-  { id:"l8",  type:"rule",     text:"Gemini sentiment check: bounty #2 submission — score 0.78 (PASS)",               time:now()-495000  },
-  { id:"l9",  type:"pay",      text:"A2A payment: 5 PROS → Analytics Agent | memo: Daily report #47 (tx: 0xa1b2…c3d4)", time:now()-3600000 },
-  { id:"l10", type:"approve",  text:"Bounty #3 approved — 200 PROS + 1 bond released → 0xABCD…1234 (tx: 0xc9d0…e1f2)", time:now()-14400000 },
-  { id:"l11", type:"multisig", text:"Multi-sig request ms1 created — 150 PROS payment pending Owner approval",        time:now()-3600000 },
-  { id:"l12", type:"rule",     text:"Rate-limit check: 0xUser1…aBcD cooldown OK (last payout >24h ago) ✓",            time:now()-200000  },
-  { id:"l13", type:"info",     text:"Agent heartbeat — block #1,482,391 | gas: 0.001 gwei | status: nominal",         time:now()-100000  },
-];
-
-const SEED_NOTIFICATIONS = [
-  { id:"n1", type:"bounty",  msg:"Bounty #2 has a new submission from 0xDEAD…BEEF",        time:now()-500000,  read:false },
-  { id:"n2", type:"payment", msg:"Payment of 5 PROS sent to Analytics Agent",               time:now()-3600000, read:false },
-  { id:"n3", type:"approve", msg:"Bounty #3 approved — 200 PROS released to 0xABCD…1234",  time:now()-14400000,read:true  },
-  { id:"n4", type:"rule",    msg:"RULE VIOLATION: Marketing payment blocked outside hours", time:now()-7200000, read:false },
-  { id:"n5", type:"multisig",msg:"Multi-sig request ms1 requires your approval",            time:now()-3600000, read:false },
-];
-
-// ─────────────────────────────────────────────────────────────────────────────
-
-// GLOBAL CSS
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -497,6 +386,20 @@ function NotificationBell({ notifications, setNotifications }) {
 // ─────────────────────────────────────────────────────────────────────────────
 // TAB: OVERVIEW
 // ─────────────────────────────────────────────────────────────────────────────
+function AccessDenied({ role }) {
+  return (
+    <div className="card" style={{maxWidth:640}}>
+      <div className="ctitle"><span className="cdot" style={{background:"var(--red)"}}/>Protected Admin Route</div>
+      <p className="muted" style={{lineHeight:1.7}}>
+        Admin capabilities are available only to wallets that are contract owners. Your authenticated role is <b>{role}</b>.
+      </p>
+      <p className="muted" style={{lineHeight:1.7,marginTop:10}}>
+        Connect the owner wallet on Pharos Testnet to access treasury controls, rule management, multi-sig approvals, emergency controls, and monitoring.
+      </p>
+    </div>
+  );
+}
+
 function OverviewTab({ tokenBalances, bounties, payments, txns, logs, multisigQueue, agents, rules }) {
   const openB   = bounties.filter(b=>b.status==="open").length;
   const pendB   = bounties.filter(b=>b.status==="submitted").length;
@@ -651,14 +554,41 @@ function TreasuryTab({ tokenBalances, setTokenBalances, txns, setTxns, addLog, a
   const [dailyV, setDailyV] = useState(String(rules.numeric.MAX_DAILY_SPEND_PERCENT?.value||20));
   const [floorV, setFloorV] = useState(String(rules.numeric.RESERVE_FLOOR?.value||200));
   const [emAddr, setEmAddr] = useState(rules.string.EMERGENCY_SAFE_ADDR?.value||"");
+  const [dailyAllowance, setDailyAllowance] = useState({ limit:null, remaining:null });
   const isOwner = role==="Owner";
   const isAgent = role==="Owner"||role==="Agent";
   const paused  = rules.bool.EMERGENCY_PAUSE?.value;
   const pros    = tokenBalances.PROS;
   const floor   = rules.numeric.RESERVE_FLOOR?.value||200;
   const dailyPct= rules.numeric.MAX_DAILY_SPEND_PERCENT?.value||20;
-  const dailyCap= pros*dailyPct/100;
-  const spentToday = 213; // simulated
+  const dailyCap= dailyAllowance.limit ?? (pros*dailyPct/100);
+  const spentToday = dailyAllowance.remaining === null ? 0 : Math.max(0, dailyCap - dailyAllowance.remaining);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadAllowance() {
+      if (!contracts.treasuryManager) {
+        setDailyAllowance({ limit:null, remaining:null });
+        return;
+      }
+      try {
+        const [limitRaw, remainingRaw] = await Promise.all([
+          contracts.treasuryManager.dailyLimit(),
+          contracts.treasuryManager.remainingDailyAllowance()
+        ]);
+        if (!cancelled) {
+          setDailyAllowance({
+            limit: Number(ethers.formatEther(limitRaw)),
+            remaining: Number(ethers.formatEther(remainingRaw))
+          });
+        }
+      } catch (error) {
+        console.error(error);
+      }
+    }
+    loadAllowance();
+    return () => { cancelled = true; };
+  }, [contracts]);
 
   const deposit = async () => {
     const a = parseFloat(depAmt);
@@ -2137,14 +2067,13 @@ function AdminTab({ multisigQueue, setMultisigQueue, rules, setRules, agents, bo
 
             {[
 
-              {role:"Owner",  clr:"var(--cyan)",   addr:"0xOwner…9F8E", perms:["Set rules","Emergency pause/resume","Multi-sig approve","Set reserve floor","Transfer ownership","Set emergency address"]},
+              {role:"Owner",  clr:"var(--cyan)",   source:"Contract owner wallet", perms:["Set rules","Emergency pause/resume","Multi-sig approve","Set reserve floor","Transfer ownership","Set emergency address"]},
 
-              {role:"Agent",  clr:"var(--violet)", addr:"0xAgent…3C4D", perms:["Create bounties","Approve/reject submissions","Pay agents","Execute scheduled payments","Register agents","Withdraw (daily limit)"]},
+              {role:"Agent",  clr:"var(--violet)", source:"On-chain agent role", perms:["Create bounties","Approve/reject submissions","Pay agents","Execute scheduled payments","Register agents","Withdraw (daily limit)"]},
 
-              {role:"Verifier",clr:"var(--amber)",  addr:"0xVerif…1A2B", perms:["Run Gemini AI review","Flag submissions","View treasury (read-only)","Sentiment analysis"]},
+              {role:"Verifier",clr:"var(--amber)",  source:"Bounty verifier role", perms:["Run PVE review","Flag submissions","View treasury (read-only)","Sentiment analysis"]},
 
-              {role:"User",   clr:"var(--green)",  addr:"Public",       perms:["Deposit funds","Submit bounty work","View all public state","Read rules"]},
-
+              {role:"User",   clr:"var(--green)",  source:"Connected public wallet", perms:["Deposit funds","Submit bounty work","View all public state","Read rules"]},
             ].map(r=>(
 
               <div key={r.role} style={{padding:"10px 0",borderBottom:"1px solid rgba(30,47,74,.35)"}}>
@@ -2155,7 +2084,7 @@ function AdminTab({ multisigQueue, setMultisigQueue, rules, setRules, agents, bo
 
                   <span style={{fontWeight:600,fontSize:13,color:r.clr}}>{r.role}</span>
 
-                  <span style={{fontFamily:"var(--mono)",fontSize:10,color:"var(--muted)",marginLeft:"auto"}}>{r.addr}</span>
+                  <span style={{fontFamily:"var(--mono)",fontSize:10,color:"var(--muted)",marginLeft:"auto"}}>{r.source}</span>
 
                 </div>
 
@@ -2819,7 +2748,7 @@ function CommandsTab({ tokenBalances, bounties, agents, rules, payments, role, a
 
 export default function App() {
   const [tab,           setTab]           = useState("overview");
-  const [role,          setRole]          = useState("Owner");
+  const [role,          setRole]          = useState("Disconnected");
   const [connected,     setConnected]     = useState(false);
   const [account,       setAccount]       = useState("");
   const [provider,      setProvider]      = useState(null);
@@ -2827,16 +2756,16 @@ export default function App() {
   const [contracts,     setContracts]     = useState({});
   const [chainReady,    setChainReady]    = useState(isChainReady());
   const [onChainLive,   setOnChainLive]   = useState(false);
-  const [tokenBalances, setTokenBalances] = useState({PROS:1450,"USDC-P":320,"ETH-P":0.47});
-  const [bounties,      setBounties]      = useState(SEED_BOUNTIES);
-  const [agents,        setAgents]        = useState(SEED_AGENTS);
-  const [payments,      setPayments]      = useState(SEED_PAYMENTS);
-  const [scheduled,     setScheduled]     = useState(SEED_SCHEDULED);
-  const [txns,          setTxns]          = useState(SEED_TXNS);
-  const [rules,         setRules]         = useState(SEED_RULES);
-  const [logs,          setLogs]          = useState(SEED_LOGS);
-  const [msQueue,       setMsQueue]       = useState(SEED_MULTISIG);
-  const [notifications, setNotifications] = useState(SEED_NOTIFICATIONS);
+  const [tokenBalances, setTokenBalances] = useState({PROS:0,"USDC-P":0,"ETH-P":0});
+  const [bounties,      setBounties]      = useState([]);
+  const [agents,        setAgents]        = useState([]);
+  const [payments,      setPayments]      = useState([]);
+  const [scheduled,     setScheduled]     = useState([]);
+  const [txns,          setTxns]          = useState([]);
+  const [rules,         setRules]         = useState({ numeric:{}, bool:{}, string:{} });
+  const [logs,          setLogs]          = useState([{ id:"startup", type:"info", text:"Connect a wallet to load live Pharos contract state.", time:now() }]);
+  const [msQueue,       setMsQueue]       = useState([]);
+  const [notifications, setNotifications] = useState([]);
   const [toasts,        setToasts]        = useState([]);
 
 
@@ -2855,29 +2784,27 @@ export default function App() {
 
   },[]);
 
-  const syncOnChainState = useCallback(async (chainContracts = contracts) => {
+  const syncOnChainState = useCallback(async (chainContracts = contracts, currentAccount = account) => {
     if (!chainContracts || Object.keys(chainContracts).length === 0) return;
 
     try {
-      const [ruleSet, treasuryBalance, chainBounties, chainAgents, chainPayments, treasuryRequests] = await Promise.all([
+      const [ruleSet, treasuryBalance, chainBounties, chainAgents, chainPayments, treasuryRequests, accessProfile] = await Promise.all([
         chainContracts.ruleEngine ? fetchRuleSet(chainContracts.ruleEngine) : null,
         chainContracts.treasuryManager ? fetchTreasuryBalance(chainContracts.treasuryManager) : null,
         chainContracts.bountyManager ? fetchBounties(chainContracts.bountyManager) : null,
         chainContracts.agentPaymentRouter ? fetchAgents(chainContracts.agentPaymentRouter) : null,
         chainContracts.agentPaymentRouter ? fetchPayments(chainContracts.agentPaymentRouter) : null,
-        chainContracts.treasuryManager ? fetchTreasuryRequests(chainContracts.treasuryManager) : null
+        chainContracts.treasuryManager ? fetchTreasuryRequests(chainContracts.treasuryManager) : null,
+        fetchAccessProfile(chainContracts, currentAccount)
       ]);
 
       if (ruleSet) setRules(ruleSet);
       if (treasuryBalance) setTokenBalances((b) => ({ ...b, ...treasuryBalance }));
-      if (chainBounties && chainBounties.length) setBounties(chainBounties);
-      if (chainAgents && chainAgents.length) setAgents(chainAgents);
-      if (chainPayments && chainPayments.length) setPayments(chainPayments);
-      if (treasuryRequests && treasuryRequests.length) setMsQueue((q) => {
-        const existing = new Set(q.map((item) => `${item.source || "router"}-${item.id}`));
-        const merged = treasuryRequests.filter((item) => !existing.has(`${item.source}-${item.id}`));
-        return merged.length ? [...merged, ...q] : q;
-      });
+      if (chainBounties) setBounties(chainBounties);
+      if (chainAgents) setAgents(chainAgents);
+      if (chainPayments) setPayments(chainPayments);
+      if (treasuryRequests) setMsQueue(treasuryRequests);
+      if (accessProfile?.role) setRole(accessProfile.role);
 
       setOnChainLive(Boolean(ruleSet || treasuryBalance || chainBounties || chainAgents || chainPayments));
       addLog({ type: "info", text: "On-chain dashboard state synchronized." });
@@ -2885,13 +2812,14 @@ export default function App() {
       console.error(error);
       toast("Failed to synchronize on-chain state", "error");
     }
-  }, [contracts, addLog, toast]);
+  }, [contracts, account, addLog, toast]);
 
 
 
   const disconnectWallet = () => {
     setConnected(false);
     setAccount("");
+    setRole("Disconnected");
     setSigner(null);
     setProvider(null);
     setContracts({});
@@ -2906,6 +2834,7 @@ export default function App() {
     }
 
     try {
+      await switchToPharos(window.ethereum);
       const browserProvider = new ethers.BrowserProvider(window.ethereum);
       await browserProvider.send("eth_requestAccounts", []);
       const signer = await browserProvider.getSigner();
@@ -2920,7 +2849,7 @@ export default function App() {
       setChainReady(isChainReady());
       toast(`Connected ${shortAddr(address)}`, "success");
 
-      await syncOnChainState(chainContracts);
+      await syncOnChainState(chainContracts, address);
     } catch (error) {
       console.error(error);
       toast("Wallet connection failed", "error");
@@ -2936,13 +2865,12 @@ export default function App() {
 
       if (accounts.length === 0) {
 
-        setConnected(false);
-
-        setAccount("");
+        disconnectWallet();
 
       } else {
 
         setAccount(accounts[0]);
+        if (contracts && Object.keys(contracts).length) syncOnChainState(contracts, accounts[0]);
 
       }
 
@@ -2994,30 +2922,6 @@ export default function App() {
   // Auto-scroll terminal
 
   useEffect(()=>{ const el=document.getElementById("term-body"); if(el) el.scrollTop=el.scrollHeight; },[logs,tab]);
-
-
-
-  // Agent heartbeat
-
-  useEffect(()=>{
-
-    const beats = [
-
-      ()=>({type:"rule",  text:`Guardrail check: MAX_DAILY_SPEND=${rules.numeric.MAX_DAILY_SPEND_PERCENT?.value}% → ${fmt(tokenBalances.PROS*rules.numeric.MAX_DAILY_SPEND_PERCENT?.value/100)} PROS/day OK ✓`}),
-
-      ()=>({type:"info",  text:`Heartbeat — block synced | PROS:${fmt(tokenBalances.PROS)} | gas:0.001gwei | status:nominal`}),
-
-      ()=>({type:"info",  text:`Idempotency check: no duplicate scheduled payments detected ✓`}),
-
-      ()=>({type:"rule",  text:`Rate-limit scan: all payout cooldowns OK ✓`}),
-
-    ];
-
-    const id=setInterval(()=>{ addLog(beats[Math.floor(Math.random()*beats.length)]()); },9000);
-
-    return ()=>clearInterval(id);
-
-  },[tokenBalances.PROS, rules.numeric.MAX_DAILY_SPEND_PERCENT?.value]);
 
 
 
@@ -3089,13 +2993,9 @@ export default function App() {
 
             <div className="role-wrap">
 
-              <span className="role-lbl">Role:</span>
+              <span className="role-lbl">Authenticated Role:</span>
 
-              <select className={`role-sel role-${role}`} value={role} onChange={e=>{setRole(e.target.value);toast(`Switched to ${e.target.value} role`,"info");}}>
-
-                {ROLES.map(r=><option key={r} value={r}>{r}</option>)}
-
-              </select>
+              <span className={`role-sel role-${role}`}>{role}</span>
 
             </div>
 
@@ -3181,7 +3081,9 @@ export default function App() {
 
           {tab==="rules"   &&<RulesTab rules={rules} setRules={setRules} {...sharedProps}/>}
 
-          {tab==="admin"   &&<AdminTab multisigQueue={msQueue} setMultisigQueue={setMsQueue} rules={rules} setRules={setRules} agents={agents} bounties={bounties} tokenBalances={tokenBalances} {...sharedProps}/>}
+          {tab==="admin"   &&(role==="Owner"
+            ? <AdminTab multisigQueue={msQueue} setMultisigQueue={setMsQueue} rules={rules} setRules={setRules} agents={agents} bounties={bounties} tokenBalances={tokenBalances} {...sharedProps}/>
+            : <AccessDenied role={role}/>)}
 
           {tab==="audit"   &&<AuditTab logs={logs}/>}
 

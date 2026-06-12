@@ -59,6 +59,7 @@ contract AgentPaymentRouter is Ownable, ReentrancyGuard {
 
     event AgentRegistered(address indexed agentAddr, string name, string metadataURI);
     event AgentStatusUpdated(address indexed agentAddr, bool active);
+    event AgentRemoved(address indexed agentAddr);
     event AgentDailyLimitUpdated(address indexed agentAddr, uint256 dailyLimit);
     event AgentPayment(address indexed fromAgent, address indexed toAgent, uint256 amount, string memo, uint256 timestamp, address indexed token);
     event PaymentQueued(uint256 indexed paymentId, address indexed recipient, uint256 amount, address indexed token, bytes32 idempotencyKey);
@@ -144,6 +145,20 @@ contract AgentPaymentRouter is Ownable, ReentrancyGuard {
         require(agents[agentAddr].registeredAt != 0, "AgentPaymentRouter: agent not registered");
         agents[agentAddr].active = false;
         emit AgentStatusUpdated(agentAddr, false);
+    }
+
+    function removeAgent(address agentAddr) external onlyAgent {
+        require(agents[agentAddr].registeredAt != 0, "AgentPaymentRouter: agent not registered");
+        delete agents[agentAddr];
+        uint256 length = agentAddresses.length;
+        for (uint256 i = 0; i < length; i++) {
+            if (agentAddresses[i] == agentAddr) {
+                agentAddresses[i] = agentAddresses[length - 1];
+                agentAddresses.pop();
+                break;
+            }
+        }
+        emit AgentRemoved(agentAddr);
     }
 
     function setAgentDailyLimit(address agentAddr, uint256 limit) external onlyAgent {

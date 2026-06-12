@@ -1,6 +1,7 @@
 import "dotenv/config";
 import "@nomicfoundation/hardhat-ethers";
 import "@nomicfoundation/hardhat-chai-matchers";
+import "solidity-coverage";
 import "./tasks/seed";
 import { HardhatUserConfig } from "hardhat/config";
 

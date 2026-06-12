@@ -2,6 +2,9 @@
   "name": "agent-fundraiser",
   "version": "1.0.0",
   "private": true,
+  "engines": {
+    "node": ">=18 <=22"
+  },
   "scripts": {
     "compile": "npx hardhat compile",
     "test": "npx hardhat test",

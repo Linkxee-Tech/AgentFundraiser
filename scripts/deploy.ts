@@ -39,10 +39,6 @@ async function main() {
   console.log(`Deploying Agent Fundraiser with ${deployer.address}`);
   console.log(`Agent address: ${agentAddress}`);
 
-  const RuleEngine = await ethers.getContractFactory("RuleEngine");
-  const ruleEngine = await RuleEngine.deploy(agentAddress);
-  await ruleEngine.waitForDeployment();
-
   const TreasuryManager = await ethers.getContractFactory("TreasuryManager");
   const treasuryManager = await TreasuryManager.deploy(agentAddress, dailyLimit, reserveFloor);
   await treasuryManager.waitForDeployment();
@@ -58,6 +54,10 @@ async function main() {
     paymentMultiSigThreshold
   );
   await agentPaymentRouter.waitForDeployment();
+
+  const RuleEngine = await ethers.getContractFactory("RuleEngine");
+  const ruleEngine = await RuleEngine.deploy(agentAddress);
+  await ruleEngine.waitForDeployment();
 
   await (await treasuryManager.setEmergencySafeAddress(emergencySafe)).wait();
   if (treasuryMultiSigThreshold > 0n) {

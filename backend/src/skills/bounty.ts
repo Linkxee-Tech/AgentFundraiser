@@ -38,8 +38,12 @@ export async function reviewPendingSubmissions(bountyManager: Contract, rules: R
       const submission = await bountyManager.getSubmission(bountyId, index);
       if (submission.approved || submission.rejected) continue;
       const proof = ethers.toUtf8String(submission.proof);
-      const result = await reviewSubmission(description, proof);
-      log("info", "bounty_ai_review", `AI reviewed bounty ${bountyId} submission ${index}`, result);
+      const result = await reviewSubmission(description, proof, {
+        bountyId: String(bountyId),
+        submissionIndex: index,
+        submitter: submission.submitter
+      });
+      log("info", "bounty_pve_review", `PVE reviewed bounty ${bountyId} submission ${index}`, result);
       if (result.recommend === "approve" && result.score >= config.minAiScore) {
         const tx = await bountyManager.approveBounty(bountyId, submission.submitter);
         log("info", "bounty_approve_submitted", `Approving bounty ${bountyId}`, { hash: tx.hash });

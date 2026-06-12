@@ -9,6 +9,13 @@ const addresses = {
   ethToken: import.meta.env.VITE_ETH_TOKEN_ADDRESS || ""
 };
 
+export const pharosNetwork = {
+  chainId: import.meta.env.VITE_PHAROS_CHAIN_ID || "",
+  chainName: import.meta.env.VITE_PHAROS_CHAIN_NAME || "Pharos Testnet",
+  rpcUrl: import.meta.env.VITE_PHAROS_RPC_URL || "",
+  explorerUrl: import.meta.env.VITE_PHAROS_BLOCK_EXPLORER_URL || ""
+};
+
 const ERC20_ABI = [
   "function allowance(address owner, address spender) external view returns (uint256)",
   "function approve(address spender, uint256 amount) external returns (bool)",
@@ -30,7 +37,10 @@ const ABIS = {
     "event Withdrawn(address indexed to,uint256 amount,address indexed token)",
     "event WithdrawalRequestSubmitted(uint256 indexed requestId,address indexed to,uint256 amount,address indexed token)",
     "event WithdrawalRequestApproved(uint256 indexed requestId,address indexed approver)",
+    "event WithdrawalRequestRejected(uint256 indexed requestId,address indexed rejector)",
     "event WithdrawalRequestExecuted(uint256 indexed requestId,address indexed to,uint256 amount,address indexed token)",
+    "event RequestExpired(uint256 indexed requestId)",
+    "event EmergencyPaused(bool paused)",
     "function deposit() external payable",
     "function depositERC20(address token, uint256 amount) external",
     "function withdraw(address to, uint256 amount) external",
@@ -42,10 +52,11 @@ const ABIS = {
     "function approveRequest(uint256 requestId) external",
     "function rejectRequest(uint256 requestId) external",
     "function executeRequest(uint256 requestId) external",
-    "function withdrawalRequests(uint256 requestId) external view returns (address to,uint256 amount,address token,address requester,bool agentApproved,bool ownerApproved,bool executed,bool rejected,uint256 createdAt)",
+    "function withdrawalRequests(uint256 requestId) external view returns (address to,uint256 amount,address token,address requester,bool agentApproved,bool ownerApproved,bool executed,bool rejected,bool expired,uint256 createdAt)",
     "function nextWithdrawalRequestId() external view returns (uint256)",
     "function balance() external view returns (uint256)",
     "function tokenBalance(address token) external view returns (uint256)",
+    "function remainingDailyAllowance() external view returns (uint256)",
     "function setDailyLimit(uint256 newLimit) external",
     "function setMultiSigThreshold(uint256 newThreshold) external",
     "function setEmergencyPause(bool paused) external",
@@ -54,7 +65,9 @@ const ABIS = {
     "function setEmergencyWithdrawAddress(address safeAddress) external",
     "function emergencyPause() external view returns (bool)",
     "function reserveFloor() external view returns (uint256)",
-    "function dailyLimit() external view returns (uint256)"
+    "function dailyLimit() external view returns (uint256)",
+    "function agent() external view returns (address)",
+    "function owner() external view returns (address)"
   ],
   bountyManager: [
     "event BountyCreated(uint256 indexed bountyId,address indexed creator,uint256 reward,address indexed token,uint256 deadline)",
@@ -72,6 +85,9 @@ const ABIS = {
     "function updateReward(uint256 bountyId) external payable",
     "function updateTokenReward(uint256 bountyId, uint256 addedAmount) external",
     "function nextBountyId() external view returns (uint256)",
+    "function agent() external view returns (address)",
+    "function verifier() external view returns (address)",
+    "function owner() external view returns (address)",
     "function bounties(uint256 bountyId) external view returns (address creator,uint256 reward,uint256 deadline,bytes description,address token,address verifier,uint8 status,uint256 submissionBond,uint256 escrowed)",
     "function getSubmissionCount(uint256 bountyId) external view returns (uint256)",
     "function getSubmission(uint256 bountyId, uint256 index) external view returns (tuple(address submitter,bytes proof,uint256 timestamp,bool approved,bool rejected))"
@@ -79,11 +95,13 @@ const ABIS = {
   agentPaymentRouter: [
     "event AgentRegistered(address indexed agentAddr,string name,string metadataURI)",
     "event AgentStatusUpdated(address indexed agentAddr,bool active)",
+    "event AgentRemoved(address indexed agentAddr)",
     "event AgentPayment(address indexed fromAgent,address indexed toAgent,uint256 amount,string memo,uint256 timestamp,address indexed token)",
     "event PaymentQueued(uint256 indexed paymentId,address indexed recipient,uint256 amount,address indexed token,bytes32 idempotencyKey)",
     "function registerAgent(address agentAddr, string name, string metadataURI, uint256 dailyLimit) external",
     "function updateAgentStatus(address agentAddr, bool isActive) external",
     "function revokeAgent(address agentAddr) external",
+    "function removeAgent(address agentAddr) external",
     "function setAgentDailyLimit(address agentAddr, uint256 limit) external",
     "function payAgent(address recipient, uint256 amount, string memo, address token) external",
     "function payAgentWithIdempotency(address recipient, uint256 amount, string memo, address token, bytes32 idempotencyKey) external",
@@ -92,18 +110,29 @@ const ABIS = {
     "function getAgentInfo(address agentAddr) external view returns (address agentAddr,string name,string metadataURI,bool active,uint256 registeredAt,uint256 dailyLimit,uint256 paidToday,uint256 lastReset)",
     "function listAgents(uint256 offset, uint256 limit) external view returns (tuple(address agentAddr,string name,string metadataURI,bool active,uint256 registeredAt,uint256 dailyLimit,uint256 paidToday,uint256 lastReset)[] memory)",
     "function listPayments(uint256 offset, uint256 limit) external view returns (tuple(address fromAgent,address toAgent,uint256 amount,string memo,uint256 timestamp,address token,bytes32 idempotencyKey)[])",
-    "function paymentHistoryLength() external view returns (uint256)"
+    "function paymentHistoryLength() external view returns (uint256)",
+    "function agent() external view returns (address)",
+    "function approver() external view returns (address)",
+    "function owner() external view returns (address)"
   ],
   ruleEngine: [
     "event NumericRuleUpdated(bytes32 indexed key,uint256 value)",
     "event BoolRuleUpdated(bytes32 indexed key,bool value)",
     "event StringRuleUpdated(bytes32 indexed key,string value)",
+    "event RuleCreated(bytes32 indexed key,string ruleType)",
+    "event RuleChanged(bytes32 indexed key,string ruleType)",
+    "event RuleDeleted(bytes32 indexed key,string ruleType)",
     "function setNumericRule(bytes32 key, uint256 value) external",
     "function setBoolRule(bytes32 key, bool value) external",
     "function setStringRule(bytes32 key, string value) external",
+    "function deleteNumericRule(bytes32 key) external",
+    "function deleteBoolRule(bytes32 key) external",
+    "function deleteStringRule(bytes32 key) external",
     "function getNumericRule(bytes32 key) external view returns (uint256)",
     "function getBoolRule(bytes32 key) external view returns (bool)",
-    "function getStringRule(bytes32 key) external view returns (string memory)"
+    "function getStringRule(bytes32 key) external view returns (string memory)",
+    "function agent() external view returns (address)",
+    "function owner() external view returns (address)"
   ]
 };
 
@@ -114,6 +143,74 @@ export function isChainReady() {
     addresses.agentPaymentRouter,
     addresses.ruleEngine
   ].every((address) => address && address !== "");
+}
+
+export async function switchToPharos(ethereum) {
+  if (!ethereum || !pharosNetwork.chainId) return;
+  const chainId = pharosNetwork.chainId.startsWith("0x")
+    ? pharosNetwork.chainId
+    : `0x${Number(pharosNetwork.chainId).toString(16)}`;
+
+  try {
+    await ethereum.request({ method: "wallet_switchEthereumChain", params: [{ chainId }] });
+  } catch (error) {
+    if (error?.code !== 4902 || !pharosNetwork.rpcUrl) throw error;
+    await ethereum.request({
+      method: "wallet_addEthereumChain",
+      params: [{
+        chainId,
+        chainName: pharosNetwork.chainName,
+        nativeCurrency: { name: "Pharos", symbol: "PROS", decimals: 18 },
+        rpcUrls: [pharosNetwork.rpcUrl],
+        blockExplorerUrls: pharosNetwork.explorerUrl ? [pharosNetwork.explorerUrl] : []
+      }]
+    });
+  }
+}
+
+function sameAddress(left, right) {
+  return Boolean(left && right && left.toLowerCase() === right.toLowerCase());
+}
+
+export async function fetchAccessProfile(contracts, account) {
+  const profile = {
+    role: account ? "User" : "Disconnected",
+    isOwner: false,
+    isAgent: false,
+    isVerifier: false,
+    isApprover: false
+  };
+  if (!contracts || !account) return profile;
+
+  const calls = [
+    ["treasuryOwner", contracts.treasuryManager ? () => contracts.treasuryManager.owner() : null],
+    ["treasuryAgent", contracts.treasuryManager ? () => contracts.treasuryManager.agent() : null],
+    ["bountyOwner", contracts.bountyManager ? () => contracts.bountyManager.owner() : null],
+    ["bountyAgent", contracts.bountyManager ? () => contracts.bountyManager.agent() : null],
+    ["bountyVerifier", contracts.bountyManager ? () => contracts.bountyManager.verifier() : null],
+    ["paymentOwner", contracts.agentPaymentRouter ? () => contracts.agentPaymentRouter.owner() : null],
+    ["paymentAgent", contracts.agentPaymentRouter ? () => contracts.agentPaymentRouter.agent() : null],
+    ["paymentApprover", contracts.agentPaymentRouter ? () => contracts.agentPaymentRouter.approver() : null],
+    ["ruleOwner", contracts.ruleEngine ? () => contracts.ruleEngine.owner() : null],
+    ["ruleAgent", contracts.ruleEngine ? () => contracts.ruleEngine.agent() : null]
+  ];
+
+  const resolved = {};
+  for (const [key, fn] of calls) {
+    if (!fn) continue;
+    try {
+      resolved[key] = await fn();
+    } catch {
+      resolved[key] = "";
+    }
+  }
+
+  profile.isOwner = ["treasuryOwner", "bountyOwner", "paymentOwner", "ruleOwner"].some((key) => sameAddress(resolved[key], account));
+  profile.isAgent = ["treasuryAgent", "bountyAgent", "paymentAgent", "ruleAgent"].some((key) => sameAddress(resolved[key], account));
+  profile.isVerifier = sameAddress(resolved.bountyVerifier, account);
+  profile.isApprover = sameAddress(resolved.paymentApprover, account);
+  profile.role = profile.isOwner ? "Owner" : profile.isAgent ? "Agent" : profile.isVerifier ? "Verifier" : "User";
+  return profile;
 }
 
 export const tokenAddresses = {
@@ -284,7 +381,7 @@ export async function fetchTreasuryRequests(treasuryContract) {
       token: tokenSymbol(request.token),
       requester: request.requester,
       approvals: [request.agentApproved ? "Agent" : null, request.ownerApproved ? "Owner" : null].filter(Boolean),
-      status: request.executed ? "approved" : request.rejected ? "rejected" : "pending",
+      status: request.executed ? "approved" : request.rejected ? "rejected" : request.expired ? "expired" : "pending",
       createdAt: Number(request.createdAt) * 1000,
       source: "treasury"
     });

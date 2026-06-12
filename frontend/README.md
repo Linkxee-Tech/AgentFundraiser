@@ -171,9 +171,9 @@ npm run build
 npm run preview
 ```
 
-### Role switching
+### Wallet-derived roles
 
-Use the **Role** dropdown in the header to simulate different user roles:
+Roles are derived from the connected wallet and the deployed contract role getters:
 
 | Role | Access Level |
 |---|---|
@@ -588,3 +588,4 @@ This first version is intentionally non-upgradeable. The contracts do not use pr
 ## License
 
 MIT
+

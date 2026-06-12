@@ -46,6 +46,10 @@ describe("TreasuryManager", function () {
     await treasury.connect(agent).setEmergencySafeAddress(safe.address);
     await treasury.connect(agent).setEmergencyPause(true);
 
+    await expect(treasury.connect(agent).withdrawAll()).to.be.revertedWith("TreasuryManager: emergency timelock active");
+    await ethers.provider.send("evm_increaseTime", [3600]);
+    await ethers.provider.send("evm_mine", []);
+
     await expect(treasury.connect(agent).withdrawAll())
       .to.emit(treasury, "Withdrawn")
       .withArgs(safe.address, ethers.parseEther("3"), ethers.ZeroAddress);
@@ -62,6 +66,7 @@ describe("TreasuryManager", function () {
 
     await expect(treasury.connect(agent).submitWithdrawalRequest(recipient.address, ethers.parseEther("3")))
       .to.emit(treasury, "WithdrawalRequestSubmitted");
+    await expect(treasury.connect(agent).approveRequest(1)).to.be.revertedWith("TreasuryManager: duplicate agent approval");
     await expect(treasury.connect(owner).approveRequest(1)).to.emit(treasury, "WithdrawalRequestApproved");
     await expect(treasury.connect(owner).executeRequest(1)).to.emit(treasury, "WithdrawalRequestExecuted");
   });

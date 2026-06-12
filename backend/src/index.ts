@@ -7,6 +7,7 @@ import { getTreasurySnapshot } from "./skills/treasury.js";
 import { processExpiredBounties, reviewPendingSubmissions } from "./skills/bounty.js";
 import { runDuePayments } from "./services/scheduler.js";
 import { sendAlert } from "./services/alerts.js";
+import { initStorage } from "./services/storage.js";
 import { log } from "./utils/logger.js";
 import { readJson, writeJson } from "./utils/jsonStore.js";
 
@@ -104,6 +105,7 @@ async function loopOnce() {
 
 async function main() {
   log("info", "startup", "Agent Fundraiser backend starting", { wallet: wallet.address });
+  await initStorage();
   startHealthServer();
   attachEventListeners();
 
