@@ -1,0 +1,21 @@
+{
+  "name": "agent-fundraiser-backend",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "start": "node dist/index.js",
+    "build": "tsc -p tsconfig.json",
+    "health": "node -e \"fetch('http://localhost:'+(process.env.HEALTH_PORT||8787)+'/health').then(r=>r.text()).then(console.log)\""
+  },
+  "dependencies": {
+    "dotenv": "^16.3.1",
+    "ethers": "^6.8.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.6.2"
+  }
+}
